@@ -1,0 +1,347 @@
+/**
+* #########################
+* # Humbold University of Berlin
+* # iGEM 2019 on BioScience with chlamydoXXXon
+*
+* #########################
+* # @version  0.3
+* # @platform  arduino uno v3 atmel avr ...XYT
+* # @clock  16mHz
+* # @created  20190614
+* # @changed  20191016
+* # @user
+      epicness
+      caseChaser
+      tet
+*
+* #########################
+* # selftest, rining wires, light on big to grow, break in for sensoring
+* # grow-30sec, break-1sec
+*
+* #########################
+*/
+//#####################################################################
+// general import declaration
+#include <Arduino.h>
+
+//#####################################################################
+// pcb wiring - input analog
+int sensorPinMainVCC   = A0;    // vcc level in volt of 5 Volt system
+int sensorPinCurrent1  = A1;    // current used via shunt in mV/
+int sensorPinSensorIn1 = A2;    // opt 101  sense 680nm in mV
+int sensorPinCurrent2  = A3;    // current used via shunt in mV/
+int sensorPinSensorIn2 = A4;    // opt 101  sense 680nm in mV
+int sensorPinCurrent3  = A5;    // current used via shunt in mV/
+int sensorPinSensorIn3 = A6;    // opt 101  sense 680nm in mV   // Water Temp. Sensor DS18B20
+   // Peristaltic pump control
+// pcb wiring - input digital
+
+ int whitePin = 3;
+ int redPin   = 4;
+ int greenPin = 5;
+ int bluePin  = 6;
+
+ int pumpRun1 = 7;
+ int pumpRun2 = 8;
+ int pumpRun3 = 9;
+ int pumpRun4 = 10;
+ int pumpRun5 = 11;
+ int pumpRun6 = 12;
+ int sensorPinTempSense = 13;
+ int airValve = 14;
+
+//#####################################################################
+//  member variables - variable, to calc and screw
+int analogRead0 = 0;    // vcc main supply /opt101
+int analogRead1 = 0;    // opt101 current value
+int analogRead2 = 0;    // opt101 sensor value
+int analogRead3 = 0;
+int analogRead4 = 0;
+int analogRead5 = 0;
+int analogRead6 = 0;
+int analogRead7 = 0;
+
+int digitalRead0 = 0;   // digital sensor
+int digitalRead1 = 0;
+int digitalRead2 = 0;
+int digitalRead3 = 0;
+int digitalRead4 = 0;
+int digitalRead5 = 0;
+int digitalRead6 = 0;
+int digitalRead7 = 0;
+int digitalRead8 = 0;
+int digitalRead9 = 0;
+int digitalRead10 = 0;
+int digitalRead11 = 0;
+int digitalRead12 = 0;
+int digitalRead13 = 0;
+int digitalRead14 = 0;
+
+int inByte = 0;         // incoming serial byte
+
+int roundCycle = 0; // number of measurments
+
+int blankValue = 0;
+
+int brightnessWhite = 0; // value between 0 und 255 – for intensity of white LEDs
+int brightnessRed = 0; // value between 0 und 255 – for intensity of red LEDs
+int brightnessGreen = 0; // value between 0 und 255 – for intensity of green LEDs
+int brightnessBlue = 0; // value between 0 und 255 – for intensity of blue LEDs
+//#####################################################################
+// member variables - timing
+unsigned long previousMillis = 0;   // will store last time
+const long interval = 500;        // wait or die 30000 /sind 30 sekunden
+
+//#####################################################################
+
+/**
+ * shift the value to the external module ( MOSFET )
+ */
+void setColor() {
+  analogWrite(redPin, brightnessRed);
+  analogWrite(greenPin,brightnessGreen);
+  analogWrite(bluePin, brightnessBlue);
+  analogWrite(whitePin, brightnessWhite);
+}
+
+/**
+ * set white, red and blue to 255 and green to 50;
+ */
+ void setAllLLightOn() {
+    brightnessWhite = 255;
+    brightnessRed = 255;
+    brightnessGreen = 255;
+    brightnessBlue = 255;
+    setColor();
+ }
+
+ /**
+  * set white, red and blue to 255 and green to 50;
+  */
+  void setLightOff() {
+     brightnessWhite = 0;
+     brightnessRed = 0;
+     brightnessGreen = 0;
+     brightnessBlue = 0;
+     setColor();
+  }
+
+
+/**
+ * set white, red and blue to 255 and green to 50;
+ */
+ void setGrowLight() {
+    brightnessWhite = 255;
+    brightnessRed = 255;
+    brightnessGreen = 50;
+    brightnessBlue = 255;
+    setColor();
+ }
+
+
+
+/**
+* prepare and init variables and io procedure // initialisieren der Platine
+*/
+void setup() {
+
+  // monitoring on a remote computer / initialisierung des serielen monitors
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // getReadyStateLike
+  }
+
+  delay(2222);  // time to get upset done /warten bis programm fertig is mit rechnen
+
+  // ready we guess
+  if (Serial.available() == 0 && Serial.availableForWrite() > 0) { // bereit für sereile ausgabe
+    //Serial.available()
+    Serial.print("SERIAL["); //text ausgabe im sereilen monitor
+    Serial.print(Serial.available()); //rest ist fehlermeldung falls er nich will
+    Serial.print("|");
+    Serial.print(Serial.availableForWrite());
+    Serial.print("|");
+    Serial.print(Serial.getTimeout());
+    Serial.println("]");
+    delay(Serial.getTimeout()*1.41);
+
+  }
+
+  // gpio - input // zuweisung der pins ob eingabe oder ausgabe
+
+  pinMode(sensorPinMainVCC, INPUT); // analog0
+  pinMode(sensorPinCurrent1, INPUT); // analog1
+  pinMode(sensorPinSensorIn1, INPUT); // analog3
+  pinMode(sensorPinCurrent2, INPUT); // analog4
+  pinMode(sensorPinSensorIn2, INPUT); // analog5
+  pinMode(sensorPinCurrent3, INPUT); // analog6
+  pinMode(sensorPinSensorIn3, INPUT); // analog7
+  pinMode(sensorPinTempSense, INPUT); // digital13
+  // gpio - output
+  pinMode(whitePin, OUTPUT);
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+  pinMode(pumpRun1, OUTPUT);
+  pinMode(pumpRun2, OUTPUT);
+  pinMode(pumpRun3, OUTPUT);
+  pinMode(pumpRun4, OUTPUT);
+  pinMode(pumpRun5, OUTPUT);
+  pinMode(pumpRun6, OUTPUT);
+  pinMode(airValve, OUTPUT);
+
+
+  // informing the serial monitor, which source file was used ....
+  Serial.println("using file for this project: OPENPBR-v.0.2.cpp");
+
+  // log header
+  Serial.println("INIT[roundCycle|Vcc|Current1|Current2|Current3|Opt1|Opt2|Opt3|Temp.]"); //spalten bezeichner des serieen monitors
+
+  Serial.print("INTERVAL[");// first line in log for interval
+  Serial.print(interval);
+  Serial.println("]");
+
+  Serial.print("INPUTPORT["); // ausgabe und kontrolle der intialen variablen
+  Serial.print(millis());
+  Serial.print("|");
+  Serial.print(sensorPinMainVCC);
+  Serial.print("|");
+  Serial.print(sensorPinCurrent1);
+  Serial.print("|");
+  Serial.print(sensorPinCurrent2);
+  Serial.print("|");
+  Serial.print(sensorPinCurrent3);
+  Serial.print("|");
+  Serial.print(sensorPinSensorIn1);
+  Serial.print("|");
+  Serial.print(sensorPinSensorIn2);
+  Serial.print("|");
+  Serial.print(sensorPinSensorIn3);
+  Serial.print("|");
+  Serial.print(sensorPinTempSense);
+  Serial.println("]");
+/*
+  Serial.print("OUTPUTPORT[");
+  Serial.print(ledPWR);
+  Serial.print("|");
+  Serial.print(ledRDY);
+  Serial.print("|");
+  Serial.print(ledBSY);
+  Serial.println("]");
+*/
+
+  Serial.println("running all led to ON");
+  delay(1000);
+  setAllLLightOn();
+  delay(2222);
+  Serial.println("running all led to OFF");
+  setLightOff();
+  delay(2222);
+
+
+  Serial.println("SETUP[done]");
+}
+
+
+//#####################################################################
+// from here on running code for non blocking behaviour// ab hier echtes programm
+//#####################################################################
+
+
+/**
+* read values from wired inputs
+* send data via serial to host computer, for logging
+*/
+void doTheLogging() { //wird im loop verwendet um zu loggen
+  //if ( isItTime == 1 ) {
+    // get incoming byte:
+    inByte = Serial.read(); // start serial monitor
+    //#####################################################################
+    analogRead0 = analogRead(sensorPinMainVCC); //abholen der echten werte
+    analogRead1 = analogRead(sensorPinCurrent1);
+    analogRead2 = analogRead(sensorPinSensorIn1);
+    analogRead3 = analogRead(sensorPinCurrent2);
+    analogRead4 = analogRead(sensorPinSensorIn2);
+    analogRead5 = analogRead(sensorPinCurrent3);
+    analogRead6 = analogRead(sensorPinSensorIn3);
+
+
+    // read switch, map it to 0 or 255
+  //  digitalRead0 = map(digitalRead(digitalPinInput), 0, 1, 0, 255); // taster auswertung
+    //#####################################################################
+    // send sensor values:
+    Serial.print("DATA[");
+    Serial.print(roundCycle);
+    Serial.print("|");
+    Serial.print(analogRead0 * ( 5.0 / 1023 )); //gelesener wert auf 5 volt referenz mal  (1023) ergibt  wert
+    Serial.print("|");
+    Serial.print(analogRead1 * ( 5.0 / 1023 ));
+    Serial.print("|");
+    Serial.print(analogRead2 * ( 5.0 / 1023 ));
+    Serial.print("|");
+    Serial.print(analogRead3 * ( 5.0 / 1023 ));
+    Serial.print("|");
+    Serial.print(analogRead4 * ( 5.0 / 1023 ));
+    Serial.print("|");
+    Serial.print(analogRead5 * ( 5.0 / 1023 ));
+    Serial.print("|");
+    Serial.print(analogRead6 * ( 5.0 / 1023 ));
+    Serial.print("|");
+    Serial.print(digitalRead13);// temp senseor
+    Serial.println("]");
+  //} else {
+    // nothing
+    // Serial.println("SERIAL[UNRESOLVED]");
+    // @todo could count the unused case here :/
+//}
+    roundCycle++; // zähler für anzahl der messsung +1
+}
+
+
+/**
+* timer check and update // bist du bereit ja nein ? lampe rot/ grün // inerhalb der zeit zwischen den ausgaben
+* blinks then
+*/
+void checkUpdateTimeSlot(){ //
+  unsigned long currentMillis = millis(); // holt laufzeit seit setup()
+  if (currentMillis - previousMillis >= interval) { // es so weit
+    //Serial.print("UPDATE[");
+    //Serial.print(interval);
+    //Serial.println("]");
+    // save time
+    previousMillis = currentMillis;
+
+    // if the LED is off turn it on and vice-versa:
+    //if (ledPWR == LOW) { // blinkt beim messen
+    //  ledPWR = HIGH;
+      //isItTime = 1;
+  //  } else {
+  //    ledPWR = LOW;
+      //isItTime = 0;
+    }
+
+    doTheLogging();
+//  } else {
+    // come back later and use above
+//  }
+
+}
+
+/**
+* do the heavy shit in here
+* used methods should be declared before, top->down compiling :/
+*/
+void loop() {
+
+
+ // setColor(0x4B, 0x0, 0x82);  // indigo // use a hex converter to choose your color
+ // delay(1000);
+  // setGrowLight(); //
+  setLightOff();
+  delay(1000);
+
+  // on valid in-byte, read gpio-in
+  //doTheLogging();
+  // up and down check
+  checkUpdateTimeSlot(); // benutz die methode abfragen nach zeit zum messen
+}
